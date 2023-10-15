@@ -4,13 +4,19 @@ import (
 	"fmt"
 	stan "github.com/nats-io/stan.go"
 	"os"
-	"time"
+	"strconv"
+)
+
+const (
+	clusterID = "test-cluster"
+	clientID  = "Person2"
 )
 
 func main() {
-	var json_recieved []byte
-	clusterID := "test-cluster"
-	clientID := "Person2"
+	var (
+		i    int
+		name string
+	)
 
 	sc, err := stan.Connect(clusterID, clientID)
 	if err != nil {
@@ -20,20 +26,14 @@ func main() {
 	fmt.Print("Connected")
 
 	sub, err := sc.Subscribe("foo", func(m *stan.Msg) {
-		json_recieved = m.Data
+		name = strconv.Itoa(i+1) + ".json"
+		err = os.WriteFile(name, m.Data, 0644)
+		i++
 	}, stan.StartWithLastReceived())
 
-	time.Sleep(time.Second)
-	for i := 0; i < 3; i++ {
-		name := fmt.Sprintf("%d%s", i, ".json")
-		err = os.WriteFile(name, json_recieved, 0644)
-		time.Sleep(time.Second * 2)
+	for i < 3 {
+		_ = 0
 	}
-
-	// Unsubscribe
 	sub.Unsubscribe()
-
-	// Close connection
 	sc.Close()
-
 }
