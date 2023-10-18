@@ -2,6 +2,7 @@ package main
 
 import (
 	st "NatsStream_Service/internal/cashe"
+	"NatsStream_Service/internal/config"
 	"NatsStream_Service/internal/model"
 	postgres "NatsStream_Service/internal/storage"
 	"encoding/json"
@@ -12,14 +13,15 @@ import (
 	"net/http"
 )
 
-const (
-	clusterID = "test-cluster"
-	clientID  = "Person2"
-)
-
 func main() {
-	i := 0
-	storage, err := postgres.NewDB("host=localhost port=5432 user=user password=userwb dbname=db_wb sslmode=disable")
+	cfg := config.MustLoad("SUBSCRIBER")
+	storagePath := fmt.Sprintf(
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		cfg.DataBase.Host, cfg.DataBase.Port, cfg.DataBase.User,
+		cfg.DataBase.Password, cfg.DataBase.Dbname, cfg.DataBase.Sslmode,
+	)
+	storage, err := postgres.NewDB(storagePath)
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -32,7 +34,7 @@ func main() {
 
 	dataRecieved := *new(model.Order_client)
 
-	sc, err := stan.Connect(clusterID, clientID)
+	sc, err := stan.Connect(cfg.NatsConfig.ClusterID, cfg.NatsConfig.ClientID)
 	if err != nil {
 		fmt.Print(err)
 		return
@@ -51,7 +53,6 @@ func main() {
 		if err != nil {
 			log.Println(err)
 		}
-		i++
 	}, stan.StartWithLastReceived())
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +84,7 @@ func main() {
 			//fmt.Fprintf(w, "Hello world!")
 		}
 	})
-	server := &http.Server{Addr: ":8080"}
+	server := &http.Server{Addr: cfg.HTTPServer.Address}
 	err = server.ListenAndServe()
 	if err != nil {
 		panic(err)

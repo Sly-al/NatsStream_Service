@@ -1,6 +1,7 @@
 package main
 
 import (
+	"NatsStream_Service/internal/config"
 	"NatsStream_Service/internal/model"
 	"encoding/json"
 	"github.com/brianvoe/gofakeit/v6"
@@ -9,15 +10,11 @@ import (
 	"time"
 )
 
-const (
-	clusterID = "test-cluster"
-	clientID  = "Person1"
-)
-
 func main() {
+	cfg := config.MustLoad("PRODUCER")
 	var order model.Order_client // инициализая структуры заказа
-
-	sc, err := stan.Connect(clusterID, clientID) // подключение к Nats-Streaming
+	
+	sc, err := stan.Connect(cfg.NatsConfig.ClusterID, cfg.NatsConfig.ClientID) // подключение к Nats-Streaming
 	defer sc.Close()
 
 	if err != nil {
