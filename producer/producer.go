@@ -32,7 +32,7 @@ func main() {
 			log.Fatalf("Unable to marshal JSON due to %s", err)
 		}
 		sc.Publish("foo", jsonToSend) // Публикация в канал
-		time.Sleep(time.Second * 10)
+		time.Sleep(time.Second * 5)
 	}
 
 }
