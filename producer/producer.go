@@ -11,25 +11,38 @@ import (
 )
 
 func main() {
-	cfg := config.MustLoad("PRODUCER")
-	var order model.Order_client // инициализая структуры заказа
-	
-	sc, err := stan.Connect(cfg.NatsConfig.ClusterID, cfg.NatsConfig.ClientID) // подключение к Nats-Streaming
-	defer sc.Close()
+	cfg := config.MustLoad("PRODUCER") // загрузка конфига для producerа
+	var order model.Order_client       // структура заказа
 
+	// подключение к Nats-Streaming
+	sc, err := stan.Connect(cfg.NatsConfig.ClusterID, cfg.NatsConfig.ClientID)
 	if err != nil {
-		log.Print(err)
-		return
+		log.Fatalf("Unable to connect %s", err)
 	}
 
 	for i := 0; i < 3; i++ {
-		gofakeit.Struct(&order)                               // Создание новых заказов
-		jsonToSend, err := json.MarshalIndent(order, "", " ") // Order_client -> []byte
-		if err != nil {
-			log.Fatalf("Unable to marshal JSON due to %s", err)
-		}
-		sc.Publish("foo", jsonToSend) // Публикация в канал
 		time.Sleep(time.Second * 5)
+
+		// Создание новых заказов
+		err = gofakeit.Struct(&order)
+		if err != nil {
+			log.Printf("Unable to generate json due to %s", err)
+		}
+
+		// Order_client -> []byte
+		jsonToSend, err := json.MarshalIndent(order, "", " ")
+		if err != nil {
+			log.Printf("Unable to marshal JSON due to %s", err)
+		}
+
+		// Публикация в канал
+		err = sc.Publish("foo", jsonToSend)
+		if err != nil {
+			log.Printf("Json wasn't published due to: %s", err)
+		} else {
+			log.Printf("Send successfully: %s", order.Order_uid)
+		}
 	}
 
+	sc.Close()
 }

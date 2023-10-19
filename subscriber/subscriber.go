@@ -1,7 +1,7 @@
 package main
 
 import (
-	st "NatsStream_Service/internal/cashe"
+	cs "NatsStream_Service/internal/cashe"
 	"NatsStream_Service/internal/config"
 	"NatsStream_Service/internal/model"
 	postgres "NatsStream_Service/internal/storage"
@@ -14,30 +14,33 @@ import (
 )
 
 func main() {
-	cfg := config.MustLoad("SUBSCRIBER")
+	cfg := config.MustLoad("SUBSCRIBER") // загрузка конфига subscribera
+
+	// подключение к базе данных
 	storagePath := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		cfg.DataBase.Host, cfg.DataBase.Port, cfg.DataBase.User,
 		cfg.DataBase.Password, cfg.DataBase.Dbname, cfg.DataBase.Sslmode,
 	)
 	storage, err := postgres.NewDB(storagePath)
-
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Subscriber: %s", err)
 	}
 
-	cashe := st.NewCashe()
+	// создание кэша и его загрузка из бд
+	cashe := cs.NewCashe()
 	err = storage.UploadCashe(&cashe)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Subscriber: %s", err)
 	}
 
 	dataRecieved := *new(model.Order_client)
+	fmt.Println("First dataRec", dataRecieved)
 
+	// подключение к Nats-Streaming
 	sc, err := stan.Connect(cfg.NatsConfig.ClusterID, cfg.NatsConfig.ClientID)
 	if err != nil {
-		fmt.Print(err)
-		return
+		log.Fatalf("Subscriber: %s", err)
 	}
 
 	sub, err := sc.Subscribe("foo", func(m *stan.Msg) {
@@ -45,10 +48,12 @@ func main() {
 		if err != nil {
 			log.Println(err)
 		}
+		// добавление в кэш
 		err = cashe.InsertToCashe(dataRecieved) // два одинковых id
 		if err != nil {
 			log.Println(err)
 		}
+		// добавление в бд
 		err = storage.SaveOrder(dataRecieved)
 		if err != nil {
 			log.Println(err)

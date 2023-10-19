@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/joho/godotenv"
 	"log"
@@ -36,17 +35,19 @@ func MustLoad(app string) *Config {
 	var configPath string
 
 	if err := godotenv.Load("local.env"); err != nil {
-		log.Print("No .env file found")
+		log.Fatalf("Config error: %s", err)
 	}
 
+	// выбор config файла в зависимости от сервиса
 	switch app {
 	case "PRODUCER":
 		configPath = os.Getenv("CONFIG_PATH_PRODUCER")
 	case "SUBSCRIBER":
 		configPath = os.Getenv("CONFIG_PATH_SUBSCRIBER")
 	}
+
 	if configPath == "" {
-		log.Fatal("Config path producer is not set")
+		log.Fatalf("Config path %s is not set", app)
 	}
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		log.Fatalf("config file does not exist: %s", configPath)
@@ -57,6 +58,6 @@ func MustLoad(app string) *Config {
 	if err := cleanenv.ReadConfig(configPath, &cfg); err != nil {
 		log.Fatalf("cannot read config: %s", err)
 	}
-	fmt.Println(cfg)
+
 	return &cfg
 }
