@@ -36,7 +36,7 @@ func main() {
 		}
 
 		// Публикация в канал
-		err = sc.Publish("foo", jsonToSend)
+		err = sc.Publish("JsonPipe", jsonToSend)
 		if err != nil {
 			log.Printf("Json wasn't published due to: %s", err)
 		} else {

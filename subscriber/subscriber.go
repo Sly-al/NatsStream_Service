@@ -5,6 +5,7 @@ import (
 	"NatsStream_Service/internal/config"
 	"NatsStream_Service/internal/model"
 	postgres "NatsStream_Service/internal/storage"
+	"context"
 	"encoding/json"
 	"fmt"
 	stan "github.com/nats-io/stan.go"
@@ -35,7 +36,6 @@ func main() {
 	}
 
 	dataRecieved := *new(model.Order_client)
-	fmt.Println("First dataRec", dataRecieved)
 
 	// подключение к Nats-Streaming
 	sc, err := stan.Connect(cfg.NatsConfig.ClusterID, cfg.NatsConfig.ClientID)
@@ -43,37 +43,40 @@ func main() {
 		log.Fatalf("Subscriber: %s", err)
 	}
 
-	sub, err := sc.Subscribe("foo", func(m *stan.Msg) {
+	sub, err := sc.Subscribe("JsonPipe", func(m *stan.Msg) {
 		err := json.Unmarshal(m.Data, &dataRecieved)
 		if err != nil {
 			log.Println(err)
-		}
-		// добавление в кэш
-		err = cashe.InsertToCashe(dataRecieved) // два одинковых id
-		if err != nil {
-			log.Println(err)
-		}
-		// добавление в бд
-		err = storage.SaveOrder(dataRecieved)
-		if err != nil {
-			log.Println(err)
+		} else {
+			// добавление в кэш
+			err = cashe.InsertToCashe(dataRecieved)
+			if err != nil {
+				log.Println(err)
+			} else {
+				// добавление в бд
+				err = storage.SaveOrder(dataRecieved)
+				if err != nil {
+					log.Println(err)
+				}
+			}
 		}
 	}, stan.StartWithLastReceived())
 
+	// хэндлер для отправки json на сайт
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case "GET":
-			fmt.Println("GET METHOD")
 			tmpl, err := template.ParseFiles("template/ui.html")
 			if err != nil {
-				fmt.Println(err)
+				http.Error(w, err.Error(), 400)
+				return
 			}
 			err = tmpl.Execute(w, nil)
 			if err != nil {
-				fmt.Println(err)
+				http.Error(w, err.Error(), 500)
+				return
 			}
 		case "POST":
-			fmt.Println("POST")
 			if order, err := cashe.GetFromCashe(r.PostFormValue("order_uid")); err == nil {
 				jsonToSend, err := json.MarshalIndent(order, "", " ")
 				if err != nil {
@@ -83,18 +86,13 @@ func main() {
 					fmt.Fprintf(w, string(jsonToSend))
 				}
 			} else {
-				fmt.Fprint(w, "No such order_uid", err)
+				fmt.Fprint(w, "Error: ", err)
 			}
-			//fmt.Println("POST METHOD")
-			//fmt.Fprintf(w, "Hello world!")
 		}
 	})
 	server := &http.Server{Addr: cfg.HTTPServer.Address}
-	err = server.ListenAndServe()
-	if err != nil {
-		panic(err)
-	}
-
+	server.ListenAndServe()
 	sub.Unsubscribe()
 	sc.Close()
+	server.Shutdown(context.Background())
 }
