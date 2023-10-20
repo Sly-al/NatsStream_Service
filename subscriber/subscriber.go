@@ -12,6 +12,8 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 )
 
 func main() {
@@ -60,7 +62,7 @@ func main() {
 				}
 			}
 		}
-	}, stan.StartWithLastReceived())
+	}, stan.DeliverAllAvailable())
 
 	// хэндлер для отправки json на сайт
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -77,6 +79,7 @@ func main() {
 				return
 			}
 		case "POST":
+			fmt.Println("Post")
 			if order, err := cashe.GetFromCashe(r.PostFormValue("order_uid")); err == nil {
 				jsonToSend, err := json.MarshalIndent(order, "", " ")
 				if err != nil {
@@ -91,8 +94,17 @@ func main() {
 		}
 	})
 	server := &http.Server{Addr: cfg.HTTPServer.Address}
-	server.ListenAndServe()
+	go server.ListenAndServe()
+
+	// Make a signal channel. Register SIGINT.
+	sigch := make(chan os.Signal, 1)
+	signal.Notify(sigch, os.Interrupt)
+
+	// Wait for the signal.
+	<-sigch
+
 	sub.Unsubscribe()
 	sc.Close()
 	server.Shutdown(context.Background())
+	fmt.Println("Happy end")
 }
