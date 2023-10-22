@@ -79,7 +79,6 @@ func main() {
 				return
 			}
 		case "POST":
-			fmt.Println("Post")
 			if order, err := cashe.GetFromCashe(r.PostFormValue("order_uid")); err == nil {
 				jsonToSend, err := json.MarshalIndent(order, "", " ")
 				if err != nil {
@@ -106,5 +105,4 @@ func main() {
 	sub.Unsubscribe()
 	sc.Close()
 	server.Shutdown(context.Background())
-	fmt.Println("Happy end")
 }
